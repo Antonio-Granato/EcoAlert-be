@@ -9,9 +9,7 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.context.request.NativeWebRequest;
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @Log4j2
@@ -50,5 +48,17 @@ public class UtenteController implements UtentiApi {
     public ResponseEntity<Void> deleteUser(Integer id){
         utenteService.deleteUser(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    public ResponseEntity<UtenteDettaglioOutput> updateUser(
+            Integer id,
+            UtenteUpdateInput utenteUpdateInput
+    ) {
+
+        UtenteDettaglioOutput updated =
+                utenteService.updateUser(id, utenteUpdateInput);
+
+        return ResponseEntity.ok(updated);
     }
 }

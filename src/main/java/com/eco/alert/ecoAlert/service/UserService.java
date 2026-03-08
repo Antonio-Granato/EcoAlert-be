@@ -2,8 +2,10 @@ package com.eco.alert.ecoAlert.service;
 
 import com.eco.alert.ecoAlert.dao.CittadinoDao;
 import com.eco.alert.ecoAlert.dao.EnteDao;
+import com.eco.alert.ecoAlert.dao.SegnalazioneDao;
 import com.eco.alert.ecoAlert.entity.CittadinoEntity;
 import com.eco.alert.ecoAlert.entity.EnteEntity;
+import com.eco.alert.ecoAlert.entity.SegnalazioneEntity;
 import com.eco.alert.ecoAlert.entity.UtenteEntity;
 import com.eco.alert.ecoAlert.dao.UtenteDao;
 import com.eco.alert.ecoAlert.enums.StatoSegnalazione;
@@ -15,6 +17,9 @@ import com.ecoalert.model.*;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,6 +35,9 @@ public class UserService {
 
     @Autowired
     private EnteDao enteDao;
+
+    @Autowired
+    private SegnalazioneDao segnalazioneDao;
 
     public UtenteOutput creaUtente(UtenteInput input) {
 
@@ -79,7 +87,7 @@ public class UserService {
         cittadino.setPassword(input.getPassword());
         cittadino.setNome(input.getNome());
         cittadino.setCognome(input.getCognome());
-        cittadino.setNazione(input.getNazione());
+        cittadino.setCitta(input.getCitta());
         cittadino.setNumeroTelefono(input.getNumeroTelefono());
         cittadino.setCodiceFiscale(input.getCodiceFiscale());
 
@@ -119,7 +127,6 @@ public class UserService {
         ente.setEmail(input.getEmail());
         ente.setPassword(input.getPassword());
         ente.setNomeEnte(nomeEnte);
-        ente.setNazioneEnte(input.getNazione());
         ente.setCittaEnte(input.getCitta());
 
         EnteEntity saved = enteDao.save(ente);
@@ -174,15 +181,16 @@ public class UserService {
         // Controlla il tipo effettivo dell’utente
         if (utente instanceof CittadinoEntity cittadino) {
             output.setRuolo("cittadino");
-            output.setNome(cittadino.getNome());
             output.setCognome(cittadino.getCognome());
-            output.setNazione(cittadino.getNazione());
-            output.setNumeroTelefono(cittadino.getNumeroTelefono());
+            output.setNome(cittadino.getNome());
+            output.setCitta(cittadino.getCitta());
             output.setCodiceFiscale(cittadino.getCodiceFiscale());
+            output.setEmail(utente.getEmail());
+            output.setNumeroTelefono(cittadino.getNumeroTelefono());
         } else if (utente instanceof EnteEntity ente) {
             output.setRuolo("ente");
             output.setNomeEnte(ente.getNomeEnte());
-            output.setNazione(ente.getNazioneEnte());
+            output.setCitta(ente.getCittaEnte());
         }
 
         return output;
@@ -197,7 +205,6 @@ public class UserService {
             enteOutput.setId(ente.getId());
             enteOutput.setNomeEnte(ente.getNomeEnte());
             enteOutput.setCitta(ente.getCittaEnte());
-            enteOutput.setNazione(ente.getNazioneEnte());
             enteOutput.setEmail(ente.getEmail());
             result.add(enteOutput);
         }
@@ -238,6 +245,72 @@ public class UserService {
             enteDao.delete(ente);
             return;
         }
+    }
 
+    public UtenteDettaglioOutput updateUser(Integer id, UtenteUpdateInput input) {
+
+        UtenteEntity utente = utenteDao.findById(id)
+                .orElseThrow(() -> new UtenteNonTrovatoException("Utente non trovato"));
+
+        utente.setEmail(input.getEmail());
+
+        if (utente instanceof CittadinoEntity cittadino) {
+
+            cittadino.setNome(input.getNome());
+            cittadino.setCognome(input.getCognome());
+            cittadino.setCitta(input.getCitta());
+            cittadino.setNumeroTelefono(input.getNumeroTelefono());
+            cittadino.setCodiceFiscale(input.getCodiceFiscale());
+
+            cittadinoDao.save(cittadino);
+        }
+
+        if (utente instanceof EnteEntity ente) {
+
+            ente.setNomeEnte(input.getNome());
+            ente.setCittaEnte(input.getCitta());
+
+            enteDao.save(ente);
+        }
+
+        utenteDao.save(utente);
+
+        return getUserById(id);
+    }
+
+    @Transactional
+    public List<SegnalazioneOutput> getSegnalazioniByEnteAndStato(
+            Integer idEnte,
+            StatoSegnalazione stato
+    ) {
+
+        List<SegnalazioneEntity> segnalazioni;
+
+        if (stato != null) {
+            segnalazioni = segnalazioneDao.findByEnte_IdAndStato(idEnte, stato);
+        } else {
+            segnalazioni = segnalazioneDao.findByEnte_Id(idEnte);
+        }
+
+        return mapToOutputList(segnalazioni);
+    }
+
+    private List<SegnalazioneOutput> mapToOutputList(List<SegnalazioneEntity> entities) {
+        return entities.stream().map(se -> {
+            SegnalazioneOutput output = new SegnalazioneOutput();
+            output.setId(se.getIdSegnalazione());
+            output.setTitolo(se.getTitolo());
+            output.setDescrizione(se.getDescrizione());
+            output.setLatitudine(se.getLatitudine());
+            output.setLongitudine(se.getLongitudine());
+            output.setStato(StatoEnum.valueOf(se.getStato().name()));
+            output.setIdUtente(se.getCittadino().getId());
+            output.setIdEnte(se.getEnte().getId());
+            output.setDitta(se.getDitta());
+            ZoneOffset offset = ZoneOffset.ofHours(1); // se vuoi UTC+1
+            output.setDataSegnalazione(se.getDataSegnalazione().atOffset(offset));
+            output.setDataChiusura(se.getDataChiusura() != null ? se.getDataChiusura().atOffset(offset) : null);
+            return output;
+        }).toList();
     }
 }

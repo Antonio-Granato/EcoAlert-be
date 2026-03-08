@@ -22,8 +22,8 @@ public class CittadinoEntity extends UtenteEntity{
     @Column(name = "cognome")
     private String cognome;
 
-    @Column(name = "nazione")
-    private String nazione;
+    @Column(name = "citta")
+    private String citta;
 
     @Column(name = "numero_telefono")
     private String numeroTelefono;

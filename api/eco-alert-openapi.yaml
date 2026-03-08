@@ -153,6 +153,33 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /enti/{idEnte}/segnalazioni:
+    get:
+      tags:
+        - Enti
+      summary: Segnalazioni dell'ente filtrate per stato
+      operationId: getSegnalazioniByEnteAndStato
+      parameters:
+        - name: idEnte
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: stato
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/StatoEnum'
+      responses:
+        '200':
+          description: Lista segnalazioni
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SegnalazioneOutput'
+
   /user/{id}/segnalazione/{idSegnalazione}/commenti/{idCommento}:
     delete:
       tags:
@@ -255,6 +282,33 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+    put:
+      tags:
+        - Utenti
+      summary: Modifica dati utente
+      operationId: updateUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UtenteUpdateInput'
+      responses:
+        '200':
+          description: Utente aggiornato
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UtenteDettaglioOutput'
+        '404':
+          description: Utente non trovato
 
   /user/{id}/segnalazioni/{idSegnalazione}:
     delete:
@@ -612,8 +666,6 @@ components:
           type: string
         citta:
           type: string
-        nazione:
-          type: string
         email:
           type: string
 
@@ -721,23 +773,22 @@ components:
           type: integer
         ruolo:
           type: string
-        email:
+        cognome:
           type: string
         nome:
           type: string
-        cognome:
+        citta:
           type: string
         codiceFiscale:
+          type: string
+        email:
           type: string
         numeroTelefono:
           type: string
         nomeEnte:
           type: string
-        nazione:
-          type: string
 
     UtenteInput:
-      type: object
       properties:
         nome:
           type: string
@@ -749,11 +800,7 @@ components:
           type: string
         codiceFiscale:
           type: string
-          description: Codice fiscale del cittadino
         numeroTelefono:
-          type: string
-          description: Numero di telefono del cittadino
-        nazione:
           type: string
         citta:
           type: string
@@ -832,3 +879,19 @@ components:
         dataCaricamento:
           type: string
           format: date-time
+
+    UtenteUpdateInput:
+      type: object
+      properties:
+        nome:
+          type: string
+        cognome:
+          type: string
+        citta:
+          type: string
+        codiceFiscale:
+          type: string
+        numeroTelefono:
+          type: string
+        email:
+          type: string
