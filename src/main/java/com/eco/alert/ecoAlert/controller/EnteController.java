@@ -5,11 +5,10 @@ import com.eco.alert.ecoAlert.service.UserService;
 import com.ecoalert.api.EntiApi;
 import com.ecoalert.model.EnteOutput;
 import com.ecoalert.model.SegnalazioneOutput;
+import com.ecoalert.model.SegnalazioniStatisticheOutput;
 import com.ecoalert.model.StatoEnum;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -40,6 +39,13 @@ public class EnteController implements EntiApi {
 
         return ResponseEntity.ok(
                 userService.getSegnalazioniByEnteAndStato(idEnte, statoEntity)
+        );
+    }
+
+    @Override
+    public ResponseEntity<SegnalazioniStatisticheOutput> getSegnalazioniStatsByEnte(Integer idEnte) {
+        return ResponseEntity.ok(
+                userService.getSegnalazioniStatistiche(idEnte)
         );
     }
 }

@@ -153,6 +153,43 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /enti/{idEnte}/segnalazioni/statistiche:
+    get:
+      tags:
+        - Enti
+      summary: Ottiene il numero di segnalazioni raggruppate per stato
+      description: >
+        Restituisce il numero totale di segnalazioni associate ad un ente,
+        raggruppate per stato (INSERITO, RICEVUTO, SOSPESO, CHIUSO).
+        L'aggregazione viene effettuata lato database tramite query GROUP BY.
+      operationId: getSegnalazioniStatsByEnte
+      parameters:
+        - name: idEnte
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID dell'ente
+      responses:
+        '200':
+          description: Statistiche segnalazioni per stato
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SegnalazioniStatisticheOutput'
+        '404':
+          description: Ente non trovato
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Errore interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /enti/{idEnte}/segnalazioni:
     get:
       tags:
@@ -895,3 +932,20 @@ components:
           type: string
         email:
           type: string
+
+    SegnalazioniStatisticheOutput:
+      type: object
+      description: Numero di segnalazioni raggruppate per stato
+      properties:
+        INSERITO:
+          type: integer
+          example: 5
+        RICEVUTO:
+          type: integer
+          example: 3
+        SOSPESO:
+          type: integer
+          example: 1
+        CHIUSO:
+          type: integer
+          example: 7

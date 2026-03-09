@@ -313,4 +313,25 @@ public class UserService {
             return output;
         }).toList();
     }
+
+    public SegnalazioniStatisticheOutput getSegnalazioniStatistiche(Integer idEnte){
+
+        List<Object[]> result = segnalazioneDao.countSegnalazioniByStato(idEnte);
+
+        SegnalazioniStatisticheOutput stats = new SegnalazioniStatisticheOutput();
+
+        for(Object[] row : result){
+            StatoSegnalazione stato = (StatoSegnalazione) row[0];
+            Long count = (Long) row[1];
+
+            switch(stato){
+                case INSERITO -> stats.setINSERITO(count.intValue());
+                case RICEVUTO -> stats.setRICEVUTO(count.intValue());
+                case SOSPESO -> stats.setSOSPESO(count.intValue());
+                case CHIUSO -> stats.setCHIUSO(count.intValue());
+            }
+        }
+
+        return stats;
+    }
 }
