@@ -22,9 +22,6 @@ public class EnteEntity extends UtenteEntity{
     @Column(name = "citta")
     private String cittaEnte;
 
-    @Column(name = "nazione")
-    private String nazioneEnte;
-
     /**
      * Segnalazioni gestite dall’ente.
      * Nessun cascade → le segnalazioni non devono essere eliminate

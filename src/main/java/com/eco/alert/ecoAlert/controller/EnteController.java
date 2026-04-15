@@ -1,8 +1,12 @@
 package com.eco.alert.ecoAlert.controller;
 
+import com.eco.alert.ecoAlert.enums.StatoSegnalazione;
 import com.eco.alert.ecoAlert.service.UserService;
 import com.ecoalert.api.EntiApi;
 import com.ecoalert.model.EnteOutput;
+import com.ecoalert.model.SegnalazioneOutput;
+import com.ecoalert.model.SegnalazioniStatisticheOutput;
+import com.ecoalert.model.StatoEnum;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -17,6 +21,31 @@ public class EnteController implements EntiApi {
 
     @Override
     public ResponseEntity<List<EnteOutput>> getAllEnti() {
+
         return ResponseEntity.ok(userService.getAllEnti());
+    }
+
+    @Override
+    public ResponseEntity<List<SegnalazioneOutput>> getSegnalazioniByEnteAndStato(
+            Integer idEnte,
+            StatoEnum stato
+    ) {
+
+        StatoSegnalazione statoEntity = null;
+
+        if (stato != null) {
+            statoEntity = StatoSegnalazione.valueOf(stato.name());
+        }
+
+        return ResponseEntity.ok(
+                userService.getSegnalazioniByEnteAndStato(idEnte, statoEntity)
+        );
+    }
+
+    @Override
+    public ResponseEntity<SegnalazioniStatisticheOutput> getSegnalazioniStatsByEnte(Integer idEnte) {
+        return ResponseEntity.ok(
+                userService.getSegnalazioniStatistiche(idEnte)
+        );
     }
 }
