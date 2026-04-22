@@ -1,7 +1,6 @@
 package com.eco.alert.ecoAlert.dao;
 import com.eco.alert.ecoAlert.entity.SegnalazioneEntity;
 import com.eco.alert.ecoAlert.enums.StatoSegnalazione;
-import com.ecoalert.model.StatoEnum;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -24,5 +23,4 @@ WHERE s.ente.id = :idEnte
 GROUP BY s.stato
 """)
     List<Object[]> countSegnalazioniByStato(@Param("idEnte") Integer idEnte);
-
 }

@@ -12,123 +12,92 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 @Log4j2
 public class ExceptionController {
 
+    // Creo un metodo helper
+    private ResponseEntity<Error> buildError(String detail, String message, HttpStatus status) {
+        log.error("Errore: {} - {}", detail, message);
+
+        Error error = new Error().detail(detail).message(message);
+
+        return ResponseEntity.status(status).body(error);
+    }
+
     @ExceptionHandler(EmailDuplicataException.class)
     public ResponseEntity<Error> handleEmailDuplicata(EmailDuplicataException ex) {
-        com.ecoalert.model.Error error = new com.ecoalert.model.Error();
-        error.detail("Dati non validi");
-        error.message("Email già presente nel database");
-        log.error("EmailDuplicataException");
-        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+        return buildError("Email già presente nel database.", ex.getMessage(), HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(LoginException.class)
-    public ResponseEntity<Error> handleLoginException(LoginException exception) {
-        com.ecoalert.model.Error error = new com.ecoalert.model.Error();
-        error.detail("Dati non validi");
-        error.message(exception.getMessage());
-        log.error("LoginException:  {}", exception.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+    public ResponseEntity<Error> handleLoginException(LoginException ex) {
+        return buildError("Dati non validi.", ex.getMessage(), HttpStatus.UNAUTHORIZED);
     }
 
     @ExceptionHandler(UtenteNonTrovatoException.class)
     public ResponseEntity<Error> handleUserNotFound(UtenteNonTrovatoException ex) {
-        com.ecoalert.model.Error error = new com.ecoalert.model.Error();
-        error.detail("Utente non trovato");
-        error.message(ex.getMessage());
-        log.error("UtenteNonTrovatoException: {}", ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+        return buildError("Utente non trovato.", ex.getMessage(), HttpStatus.NOT_FOUND);
     }
 
     @ExceptionHandler(UtenteNonCittadinoException.class)
     public ResponseEntity<Error> handleUserNotCittadino(UtenteNonCittadinoException ex) {
-        com.ecoalert.model.Error error = new com.ecoalert.model.Error();
-        error.detail("Solo i cittadini possono creare segnalazioni");
-        error.message(ex.getMessage());
-        log.error("UtenteNonCittadinoException: {}", ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
+        return buildError("Solo i cittadini possono creare segnalazioni.", ex.getMessage(), HttpStatus.FORBIDDEN);
     }
 
     @ExceptionHandler(EnteNonAutorizzatoException.class)
     public ResponseEntity<Error> handleEnteSbagliato(EnteNonAutorizzatoException ex) {
-        Error error = new Error().detail("Ente non autorizzato").message(ex.getMessage());
-        log.error("EnteSbagliatoException: {}", ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
+        return buildError("Ente non autorizzato.", ex.getMessage(), HttpStatus.FORBIDDEN);
     }
 
     @ExceptionHandler(EnteNonTrovatoException.class)
     public ResponseEntity<Error> handleEnteNonTrovato(EnteNonTrovatoException ex) {
-        Error error = new Error().detail("Ente non trovato").message(ex.getMessage());
-        log.error("EnteNonTrovatoException: {}", ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+        return buildError("Ente non trovato.", ex.getMessage(), HttpStatus.NOT_FOUND);
     }
 
     @ExceptionHandler(SegnalazioneNonTrovataException.class)
     public ResponseEntity<Error> handleSegnalazioneNonTrovata(SegnalazioneNonTrovataException ex) {
-        Error error = new Error().detail("Segnalazione non trovata").message(ex.getMessage());
-        log.error("SegnalazioneNonTrovataException: {}", ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+        return buildError("Segnalazione non trovata", ex.getMessage(), HttpStatus.NOT_FOUND);
     }
 
     @ExceptionHandler(IdODatiMancantiException.class)
     public ResponseEntity<Error> handleDatiMancanti(IdODatiMancantiException ex) {
-        Error error = new Error().detail("ID utente o dati della segnalazione mancanti").message(ex.getMessage());
-        log.error("IdODatiMancantiException: {}", ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+        return buildError("Dati della segnalazione mancanti.", ex.getMessage(), HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(TitoloMancanteException.class)
     public ResponseEntity<Error> handleTitoloMancante(TitoloMancanteException ex) {
-        Error error = new Error().detail("Titolo obbligatorio").message(ex.getMessage());
-        log.error("TitoloMancanteException: {}", ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+        return buildError("Titolo mancante.", ex.getMessage(), HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(DescrizioneMancanteException.class)
     public ResponseEntity<Error> handleDescrizioneMancante(DescrizioneMancanteException ex) {
-        Error error = new Error().detail("Descrizione obbligatoria").message(ex.getMessage());
-        log.error("DescrizioneMancanteException: {}", ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+        return buildError("Descrizione mancante.", ex.getMessage(), HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(AccessoNonAutorizzatoException.class)
     public ResponseEntity<Error> handleAccessoNonAutorizzato(AccessoNonAutorizzatoException ex) {
-        Error error = new Error().detail("Non sei autorizzato").message(ex.getMessage());
-        log.error("AccessoNonAutorizzato: {}", ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
+        return buildError("Non sei autorizzato.", ex.getMessage(), HttpStatus.UNAUTHORIZED);
     }
 
     @ExceptionHandler(OperazioneNonPermessaException.class)
     public ResponseEntity<Error> handleOperazioneNonPermessa(OperazioneNonPermessaException ex) {
-        Error error = new Error().detail("Operazione non Permessa").message(ex.getMessage());
-        log.error("OperazioneNonPermessa: {}", ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
+        return buildError("Operazione non permessa.", ex.getMessage(), HttpStatus.FORBIDDEN);
     }
 
     @ExceptionHandler(AllegatoNonTrovatoException.class)
     public ResponseEntity<Error> handleAllegatoNonTrovato(AllegatoNonTrovatoException ex) {
-        Error error = new Error().detail("Allegato non trovato.").message(ex.getMessage());
-        log.error("AllegatoNonTrovato: {}", ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+        return buildError("Allegato non trovato.", ex.getMessage(), HttpStatus.NOT_FOUND);
     }
 
     @ExceptionHandler(StatoNonValidoException.class)
     public ResponseEntity<Error> handleStatoNonValido(StatoNonValidoException ex) {
-        Error error = new Error().detail("Stato Non Valido.").message(ex.getMessage());
-        log.error("StatoNonValido: {}", ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
+        return buildError("Stato non valido.", ex.getMessage(), HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(CommentoNonTrovatoException.class)
     public ResponseEntity<Error> handleCommentoNonTrovato(CommentoNonTrovatoException ex) {
-        Error error = new Error().detail("Commento non trovato.").message(ex.getMessage());
-        log.error("CommentoNonTrovato: {}", ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+        return buildError("Commento non trovato.", ex.getMessage(), HttpStatus.NOT_FOUND);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Error> handleGenericException(Exception ex) {
-        Error error = new Error().detail("Errore interno").message(ex.getMessage());
-        log.error("Exception generica: ", ex);
-        return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
+        return buildError("Errore interno.", "Si è verificato un errore.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }

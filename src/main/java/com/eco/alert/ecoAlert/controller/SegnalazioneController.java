@@ -1,6 +1,5 @@
 package com.eco.alert.ecoAlert.controller;
 
-import com.eco.alert.ecoAlert.enums.StatoSegnalazione;
 import com.eco.alert.ecoAlert.service.SegnalazioneService;
 import com.ecoalert.api.SegnalazioniApi;
 import com.ecoalert.model.SegnalazioneInput;
@@ -10,8 +9,6 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @Log4j2
 @RestController
@@ -30,31 +27,10 @@ public class SegnalazioneController implements SegnalazioniApi {
     }
 
     @Override
-    public ResponseEntity<SegnalazioneOutput> updateSegnalazioneEnte(
-            Integer idSegnalazione,
-            Integer idEnte,
-            SegnalazioneUpdateInputEnte segnalazioneUpdateInputEnte
-    ) {
-        System.out.println("Controller → idSegnalazione: " + idSegnalazione);
-        System.out.println("Controller → idEnte: " + idEnte);
-        System.out.println("Controller → stato richiesto: " + segnalazioneUpdateInputEnte.getStato());
-
-        // Converti enum OpenAPI → enum interno
-        StatoSegnalazione nuovoStato =
-                StatoSegnalazione.valueOf(segnalazioneUpdateInputEnte.getStato().name());
-
-        //ottieni la ditta
-        String nuovaDitta = segnalazioneUpdateInputEnte.getDitta();
-
-        SegnalazioneOutput updated =
-                segnalazioneService.aggiornaStatoSegnalazione(
-                        idEnte,
-                        idSegnalazione,
-                        nuovoStato,
-                        nuovaDitta
-                );
-
-        return ResponseEntity.ok(updated);
+    public ResponseEntity<SegnalazioneOutput> updateSegnalazioneEnte(Integer idSegnalazione, Integer idEnte, SegnalazioneUpdateInputEnte input) {
+        log.info("Aggiornamento Segnalazione - idSegnalazione={}, idEnte={}", idSegnalazione, idEnte);
+        SegnalazioneOutput output = segnalazioneService.aggiornaStatoSegnalazione(idSegnalazione,idEnte,input);
+        return ResponseEntity.ok(output);
     }
 
     @Override

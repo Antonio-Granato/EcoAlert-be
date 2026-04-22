@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
@@ -24,20 +24,52 @@ import java.util.Objects;
 @Log4j2
 public class SegnalazioneService {
 
-    @Autowired
-    private SegnalazioneDao segnalazioneDao;
+    private final SegnalazioneDao segnalazioneDao;
+    private final EnteDao enteDao;
+    private final UtenteDao utenteDao;
 
-    @Autowired
-    private EnteDao enteDao;
+    public SegnalazioneService(
+            SegnalazioneDao segnalazioneDao,
+            EnteDao enteDao,
+            UtenteDao utenteDao) {
+        this.segnalazioneDao = segnalazioneDao;
+        this.enteDao = enteDao;
+        this.utenteDao = utenteDao;
+    }
 
-    @Autowired
-    private UtenteDao utenteDao;
+    // =========================
+    // METODI PRIVATI (HELPER)
+    // =========================
+
+    private SegnalazioneEntity getSegnalazione(Integer id) {
+        return segnalazioneDao.findById(id)
+                .orElseThrow(() -> new SegnalazioneNonTrovataException("Segnalazione non trovata"));
+    }
+
+    private EnteEntity getEnte(Integer id) {
+        return enteDao.findById(id)
+                .orElseThrow(() -> new EnteNonTrovatoException("Ente non trovato"));
+    }
+
+    private void checkEnteAutorizzato(SegnalazioneEntity segnalazione, EnteEntity ente) {
+        if (!segnalazione.getEnte().getId().equals(ente.getId())) {
+            throw new EnteNonAutorizzatoException("Questo ente non può modificare la segnalazione");
+        }
+    }
+
+    private StatoSegnalazione convertiStato(StatoEnum statoInput) {
+        try {
+            return StatoSegnalazione.valueOf(statoInput.name());
+        } catch (IllegalArgumentException e) {
+            throw new StatoNonValidoException("Stato non valido: " + statoInput);
+        }
+    }
 
     @Transactional
     public SegnalazioneOutput creaSegnalazione(Integer idUtente, SegnalazioneInput input) {
-        log.info("Creazione segnalazione per utente con ID {}", idUtente);
+        log.info("Creazione segnalazione - userId={}, titolo={}", idUtente, input.getTitolo());
 
-        if (idUtente == null || input == null)
+        if (idUtente == null)
             throw new IdODatiMancantiException("ID utente o dati della segnalazione mancanti");
 
         if (!StringUtils.hasText(input.getTitolo()))
@@ -74,40 +106,44 @@ public class SegnalazioneService {
         return toOutput(salvata);
     }
 
+    @Transactional
     public SegnalazioneOutput aggiornaStatoSegnalazione(
             Integer idEnte,
             Integer idSegnalazione,
-            StatoSegnalazione nuovoStato,
-            String nuovaDitta) {
+            SegnalazioneUpdateInputEnte input) {
 
-        log.info("Aggiornamento segnalazione {} da parte dell'ente {}", idSegnalazione, idEnte);
+        log.info("Aggiornamento segnalazione id={} da ente={} con stato={}",
+                idSegnalazione, idEnte, input.getStato());
 
-        // Verifica esistenza segnalazione
-        SegnalazioneEntity segnalazione = segnalazioneDao.findById(idSegnalazione)
-                .orElseThrow(() -> new SegnalazioneNonTrovataException("Segnalazione non trovata"));
+        // Recupero dati
+        SegnalazioneEntity segnalazione = getSegnalazione(idSegnalazione);
+        EnteEntity ente = getEnte(idEnte);
 
-        // Verifica esistenza ente
-        EnteEntity ente = enteDao.findById(idEnte)
-                .orElseThrow(() -> new EnteNonTrovatoException("Ente non trovato"));
+        // Controllo autorizzazione
+        checkEnteAutorizzato(segnalazione, ente);
 
-        // Controllo autorizzazione: solo l'ente associato può aggiornare
-        if (!segnalazione.getEnte().getId().equals(ente.getId())) {
-            throw new EnteNonAutorizzatoException("Questo ente non può modificare la segnalazione");
+        // Conversione stato
+        StatoSegnalazione nuovoStato = convertiStato(input.getStato());
+
+        // Aggiornamento stato
+        if (segnalazione.getStato() == StatoSegnalazione.CHIUSO) {
+            throw new StatoNonValidoException("La segnalazione è già chiusa");
         }
 
-        if (nuovoStato != null) {
-            segnalazione.setStato(nuovoStato);
+        // Aggiornamento ditta
+        if (input.getDitta() != null && !input.getDitta().isBlank()) {
+            segnalazione.setDitta(input.getDitta());
         }
 
-        if (nuovaDitta != null && !nuovaDitta.isBlank()) {
-            segnalazione.setDitta(nuovaDitta);
-        }
-
-        if (nuovoStato == StatoSegnalazione.CHIUSO){
+        // Logica business: chiusura
+        if (nuovoStato == StatoSegnalazione.CHIUSO) {
             segnalazione.setDataChiusura(LocalDateTime.now());
         }
 
         SegnalazioneEntity salvata = segnalazioneDao.save(segnalazione);
+
+        log.info("Segnalazione {} aggiornata a stato {}", salvata.getIdSegnalazione(), nuovoStato);
+
         return toOutput(salvata);
     }
 
@@ -174,21 +210,42 @@ public class SegnalazioneService {
     }
 
     public SegnalazioneOutput toOutput(SegnalazioneEntity entity) {
+
         SegnalazioneOutput output = new SegnalazioneOutput();
+
         output.setId(entity.getIdSegnalazione());
         output.setTitolo(entity.getTitolo());
         output.setDescrizione(entity.getDescrizione());
         output.setLatitudine(entity.getLatitudine());
         output.setLongitudine(entity.getLongitudine());
+
         output.setStato(StatoEnum.valueOf(entity.getStato().name()));
-        output.setIdUtente(entity.getCittadino().getId());
-        output.setIdEnte(entity.getEnte().getId());
+
+        output.setIdUtente(
+                entity.getCittadino() != null ? entity.getCittadino().getId() : null
+        );
+
+        output.setIdEnte(
+                entity.getEnte() != null ? entity.getEnte().getId() : null
+        );
+
         output.setDitta(entity.getDitta());
-        ZoneOffset offset = ZoneOffset.ofHours(1); // se vuoi UTC+1
-        output.setDataSegnalazione(entity.getDataSegnalazione().atOffset(offset));
-        output.setDataChiusura(entity.getDataChiusura() != null ? entity.getDataChiusura().atOffset(offset) : null);
-        output.commenti(commentiOutputList(entity.getCommenti()));
+
+        ZoneId zone = ZoneId.systemDefault();
+
+        output.setDataSegnalazione(
+                entity.getDataSegnalazione().atZone(zone).toOffsetDateTime()
+        );
+
+        output.setDataChiusura(
+                entity.getDataChiusura() != null
+                        ? entity.getDataChiusura().atZone(zone).toOffsetDateTime()
+                        : null
+        );
+
+        output.setCommenti(commentiOutputList(entity.getCommenti()));
         output.setAllegati(allegatiOutputList(entity.getAllegati()));
+
         return output;
     }
 
@@ -206,7 +263,7 @@ public class SegnalazioneService {
             return mapToOutputList(segnalazioni);
         }
 
-        throw new RuntimeException("Ruolo utente non valido");
+        throw new AccessoNonAutorizzatoException("Ruolo utente non valido");
     }
 
     public SegnalazioneOutput getSegnalazioneById(Integer idUtente, Integer idSegnalazione) {
