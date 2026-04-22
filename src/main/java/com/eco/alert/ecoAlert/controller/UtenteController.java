@@ -24,8 +24,7 @@ public class UtenteController implements UtentiApi {
     @Override
     public ResponseEntity<UtenteDettaglioOutput> getUserById(Integer id) {
         log.info("Richiesta dettaglio utente con ID {}", id);
-        UtenteDettaglioOutput utente = utenteService.getUserById(id);
-        return ResponseEntity.ok(utente);
+        return ResponseEntity.ok(utenteService.getUserById(id));
     }
 
     @Override
@@ -38,10 +37,7 @@ public class UtenteController implements UtentiApi {
     @Override
     public ResponseEntity<SegnalazioneOutput> getSegnalazioneById(Integer id, Integer idSegnalazione) {
         log.info("Richiesta dettaglio segnalazione {} per utente {}", idSegnalazione, id);
-
-        SegnalazioneOutput segnalazione = segnalazioneService.getSegnalazioneById(id, idSegnalazione);
-
-        return ResponseEntity.ok(segnalazione);
+        return ResponseEntity.ok(segnalazioneService.getSegnalazioneById(id, idSegnalazione));
     }
 
     @Override
@@ -55,10 +51,6 @@ public class UtenteController implements UtentiApi {
             Integer id,
             UtenteUpdateInput utenteUpdateInput
     ) {
-
-        UtenteDettaglioOutput updated =
-                utenteService.updateUser(id, utenteUpdateInput);
-
-        return ResponseEntity.ok(updated);
+        return ResponseEntity.ok(utenteService.updateUser(id, utenteUpdateInput));
     }
 }

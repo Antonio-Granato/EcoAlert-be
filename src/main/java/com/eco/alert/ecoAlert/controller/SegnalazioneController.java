@@ -29,8 +29,7 @@ public class SegnalazioneController implements SegnalazioniApi {
     @Override
     public ResponseEntity<SegnalazioneOutput> updateSegnalazioneEnte(Integer idSegnalazione, Integer idEnte, SegnalazioneUpdateInputEnte input) {
         log.info("Aggiornamento Segnalazione - idSegnalazione={}, idEnte={}", idSegnalazione, idEnte);
-        SegnalazioneOutput output = segnalazioneService.aggiornaStatoSegnalazione(idSegnalazione,idEnte,input);
-        return ResponseEntity.ok(output);
+        return ResponseEntity.ok(segnalazioneService.aggiornaStatoSegnalazione(idSegnalazione, idEnte, input));
     }
 
     @Override
@@ -42,8 +41,6 @@ public class SegnalazioneController implements SegnalazioniApi {
     @Override
     public ResponseEntity<SegnalazioneOutput> updateSegnalazione(
             Integer id, Integer idSegnalazione, SegnalazioneInput input) {
-
-        SegnalazioneOutput out = segnalazioneService.modificaSegnalazione(id, idSegnalazione, input);
-        return ResponseEntity.ok(out);
+        return ResponseEntity.ok(segnalazioneService.modificaSegnalazione(id, idSegnalazione, input));
     }
 }

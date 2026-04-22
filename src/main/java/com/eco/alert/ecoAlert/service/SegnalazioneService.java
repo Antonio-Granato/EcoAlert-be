@@ -8,7 +8,6 @@ import com.eco.alert.ecoAlert.enums.StatoSegnalazione;
 import com.eco.alert.ecoAlert.exception.*;
 import com.ecoalert.model.*;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -147,23 +146,11 @@ public class SegnalazioneService {
         return toOutput(salvata);
     }
 
+    //Ho centralizzato la logica di mapping in un metodo riutilizzabile, evitando duplicazioni e mantenendo il codice più leggibile.
     private List<SegnalazioneOutput> mapToOutputList(List<SegnalazioneEntity> entities) {
-        return entities.stream().map(se -> {
-            SegnalazioneOutput output = new SegnalazioneOutput();
-            output.setId(se.getIdSegnalazione());
-            output.setTitolo(se.getTitolo());
-            output.setDescrizione(se.getDescrizione());
-            output.setLatitudine(se.getLatitudine());
-            output.setLongitudine(se.getLongitudine());
-            output.setStato(StatoEnum.valueOf(se.getStato().name()));
-            output.setIdUtente(se.getCittadino().getId());
-            output.setIdEnte(se.getEnte().getId());
-            output.setDitta(se.getDitta());
-            ZoneOffset offset = ZoneOffset.ofHours(1); // se vuoi UTC+1
-            output.setDataSegnalazione(se.getDataSegnalazione().atOffset(offset));
-            output.setDataChiusura(se.getDataChiusura() != null ? se.getDataChiusura().atOffset(offset) : null);
-            return output;
-        }).toList();
+        return entities.stream()
+                .map(this::toOutput)
+                .toList();
     }
 
     // Mappa i commenti nella DTO

@@ -9,17 +9,11 @@ import com.eco.alert.ecoAlert.entity.SegnalazioneEntity;
 import com.eco.alert.ecoAlert.entity.UtenteEntity;
 import com.eco.alert.ecoAlert.dao.UtenteDao;
 import com.eco.alert.ecoAlert.enums.StatoSegnalazione;
-import com.eco.alert.ecoAlert.exception.EmailDuplicataException;
-import com.eco.alert.ecoAlert.exception.LoginException;
-import com.eco.alert.ecoAlert.exception.OperazioneNonPermessaException;
-import com.eco.alert.ecoAlert.exception.UtenteNonTrovatoException;
+import com.eco.alert.ecoAlert.exception.*;
 import com.ecoalert.model.*;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,28 +21,57 @@ import java.util.List;
 @Log4j2
 public class UserService {
 
-    @Autowired
-    private UtenteDao utenteDao;
+    private final UtenteDao utenteDao;
+    private final CittadinoDao cittadinoDao;
+    private final EnteDao enteDao;
+    private final SegnalazioneDao segnalazioneDao;
+    private final SegnalazioneService segnalazioneService;
 
-    @Autowired
-    private CittadinoDao cittadinoDao;
+    public UserService(UtenteDao utenteDao, CittadinoDao cittadinoDao, EnteDao enteDao, SegnalazioneDao segnalazioneDao, SegnalazioneService segnalazioneService) {
+        this.utenteDao = utenteDao;
+        this.cittadinoDao = cittadinoDao;
+        this.enteDao = enteDao;
+        this.segnalazioneDao = segnalazioneDao;
+        this.segnalazioneService = segnalazioneService;
+    }
 
-    @Autowired
-    private EnteDao enteDao;
+    // HELPER METHODS PRIVATE
+    private UtenteOutput toOutput(UtenteEntity utente) {
+        UtenteOutput output = new UtenteOutput();
+        output.setId(utente.getId());
+        output.setEmail(utente.getEmail());
 
-    @Autowired
-    private SegnalazioneDao segnalazioneDao;
+        if (utente instanceof CittadinoEntity) {
+            output.setRuolo("Cittadino");
+        } else if (utente instanceof EnteEntity) {
+            output.setRuolo("Ente");
+        }
+
+        return output;
+    }
+    
+    private StatoSegnalazione convertiStato(StatoEnum statoInput) {
+        if (statoInput == null) {
+            return null;
+        }
+        
+        try {
+            return StatoSegnalazione.valueOf(statoInput.name());
+        } catch (IllegalArgumentException e) {
+            throw new StatoNonValidoException("Stato non valido: " + statoInput);
+        }
+    }
 
     public UtenteOutput creaUtente(UtenteInput input) {
 
-        log.info("Creazione nuovo utente...");
+        log.info("Creazione utente email={}, ruolo={}", input.getEmail(), input.getRuolo());
 
         if (input.getEmail() == null || input.getEmail().isBlank()) {
-            throw new IllegalArgumentException("Email obbligatoria.");
+            throw new IdODatiMancantiException("Email obbligatoria.");
         }
 
         if (input.getPassword() == null || input.getPassword().length() < 6) {
-            throw new IllegalArgumentException("Password non valida.");
+            throw new IdODatiMancantiException("Password non valida.");
         }
 
         UtenteEntity utenteConStessaMail = utenteDao.findByEmail(input.getEmail());
@@ -66,16 +89,16 @@ public class UserService {
             return creaEnte(input);
         }
 
-        throw new IllegalArgumentException("Ruolo non valido.");
+        throw new OperazioneNonPermessaException("Ruolo non valido.");
     }
 
     private UtenteOutput creaCittadino(UtenteInput input) {
 
         if (input.getNome() == null || input.getCognome() == null) {
-            throw new IllegalArgumentException("Nome e cognome obbligatori.");
+            throw new IdODatiMancantiException("Nome e cognome obbligatori.");
         }
 
-        // ❗ Impediamo che un cittadino inserisca un nome da ente
+        // Impediamo che un cittadino inserisca un nome da ente
         if (input.getNome().toLowerCase().contains("comune di")) {
             throw new OperazioneNonPermessaException(
                     "Un cittadino non può registrarsi come ente."
@@ -93,36 +116,30 @@ public class UserService {
 
         CittadinoEntity saved = cittadinoDao.save(cittadino);
 
-        UtenteOutput output = new UtenteOutput();
-        output.setId(saved.getId());
-        output.setEmail(saved.getEmail());
-        output.setRuolo("cittadino");
-
-        return output;
+        return toOutput(saved);
     }
 
     private UtenteOutput creaEnte(UtenteInput input) {
 
         if (input.getNome() == null || input.getNome().isBlank()) {
-            throw new IllegalArgumentException("Nome ente obbligatorio.");
+            throw new IdODatiMancantiException("Nome ente obbligatorio.");
         }
 
         String nomeEnte = input.getNome().trim();
 
-        // ✅ Deve iniziare con "Comune di"
+        // Deve iniziare con "Comune di"
         if (!nomeEnte.toLowerCase().startsWith("comune di ")) {
             throw new OperazioneNonPermessaException(
                     "Il nome ente deve iniziare con 'Comune di ...'"
             );
         }
 
-        // ✅ Email istituzionale obbligatoria
+        // Email istituzionale obbligatoria
         if (!isEmailIstituzionale(input.getEmail())) {
             throw new OperazioneNonPermessaException(
                     "Registrazione ente consentita solo con email istituzionale."
             );
         }
-
         EnteEntity ente = new EnteEntity();
         ente.setEmail(input.getEmail());
         ente.setPassword(input.getPassword());
@@ -131,16 +148,10 @@ public class UserService {
 
         EnteEntity saved = enteDao.save(ente);
 
-        UtenteOutput output = new UtenteOutput();
-        output.setId(saved.getId());
-        output.setEmail(saved.getEmail());
-        output.setRuolo("ente");
-
-        return output;
+        return toOutput(saved);
     }
 
     private boolean isEmailIstituzionale(String email) {
-
         String lower = email.toLowerCase();
 
         return lower.endsWith(".gov.it")
@@ -208,7 +219,6 @@ public class UserService {
             enteOutput.setEmail(ente.getEmail());
             result.add(enteOutput);
         }
-
         return result;
     }
 
@@ -217,45 +227,40 @@ public class UserService {
                 .orElseThrow(() -> new UtenteNonTrovatoException("Utente non trovato."));
 
         if (utente instanceof CittadinoEntity cittadino) {
-
             boolean hasSegnalazioniAttive = cittadino.getSegnalazioni().stream()
                     .anyMatch(s -> s.getStato() != StatoSegnalazione.CHIUSO);
-
             if (hasSegnalazioniAttive) {
                 throw new OperazioneNonPermessaException(
                         "Impossibile eliminare utente con segnalazioni attive"
                 );
             }
-
             cittadinoDao.delete(cittadino);
             return;
         }
-
         if (utente instanceof EnteEntity ente) {
-
             boolean hasSegnalazioniAttive = ente.getSegnalazioniGestite().stream()
                     .anyMatch(s -> s.getStato() != StatoSegnalazione.CHIUSO);
-
             if (hasSegnalazioniAttive) {
                 throw new OperazioneNonPermessaException(
                         "Impossibile eliminare ente con segnalazioni attive"
                 );
             }
-
             enteDao.delete(ente);
             return;
         }
     }
 
     public UtenteDettaglioOutput updateUser(Integer id, UtenteUpdateInput input) {
-
         UtenteEntity utente = utenteDao.findById(id)
                 .orElseThrow(() -> new UtenteNonTrovatoException("Utente non trovato"));
 
-        utente.setEmail(input.getEmail());
+        UtenteEntity existing = utenteDao.findByEmail(input.getEmail());
+
+        if (existing != null && !existing.getId().equals(id)) {
+            throw new EmailDuplicataException();
+        }
 
         if (utente instanceof CittadinoEntity cittadino) {
-
             cittadino.setNome(input.getNome());
             cittadino.setCognome(input.getCognome());
             cittadino.setCitta(input.getCitta());
@@ -266,7 +271,6 @@ public class UserService {
         }
 
         if (utente instanceof EnteEntity ente) {
-
             ente.setNomeEnte(input.getNome());
             ente.setCittaEnte(input.getCitta());
 
@@ -281,37 +285,19 @@ public class UserService {
     @Transactional
     public List<SegnalazioneOutput> getSegnalazioniByEnteAndStato(
             Integer idEnte,
-            StatoSegnalazione stato
+            StatoEnum stato
     ) {
+        StatoSegnalazione statoConvertito = convertiStato(stato);
 
         List<SegnalazioneEntity> segnalazioni;
 
-        if (stato != null) {
-            segnalazioni = segnalazioneDao.findByEnte_IdAndStato(idEnte, stato);
+        if (statoConvertito != null) {
+            segnalazioni = segnalazioneDao.findByEnte_IdAndStato(idEnte, statoConvertito);
         } else {
             segnalazioni = segnalazioneDao.findByEnte_Id(idEnte);
         }
 
-        return mapToOutputList(segnalazioni);
-    }
-
-    private List<SegnalazioneOutput> mapToOutputList(List<SegnalazioneEntity> entities) {
-        return entities.stream().map(se -> {
-            SegnalazioneOutput output = new SegnalazioneOutput();
-            output.setId(se.getIdSegnalazione());
-            output.setTitolo(se.getTitolo());
-            output.setDescrizione(se.getDescrizione());
-            output.setLatitudine(se.getLatitudine());
-            output.setLongitudine(se.getLongitudine());
-            output.setStato(StatoEnum.valueOf(se.getStato().name()));
-            output.setIdUtente(se.getCittadino().getId());
-            output.setIdEnte(se.getEnte().getId());
-            output.setDitta(se.getDitta());
-            ZoneOffset offset = ZoneOffset.ofHours(1); // se vuoi UTC+1
-            output.setDataSegnalazione(se.getDataSegnalazione().atOffset(offset));
-            output.setDataChiusura(se.getDataChiusura() != null ? se.getDataChiusura().atOffset(offset) : null);
-            return output;
-        }).toList();
+        return segnalazioni.stream().map(segnalazioneService::toOutput).toList();
     }
 
     public SegnalazioniStatisticheOutput getSegnalazioniStatistiche(Integer idEnte){

@@ -21,7 +21,6 @@ public class EnteController implements EntiApi {
 
     @Override
     public ResponseEntity<List<EnteOutput>> getAllEnti() {
-
         return ResponseEntity.ok(userService.getAllEnti());
     }
 
@@ -30,22 +29,11 @@ public class EnteController implements EntiApi {
             Integer idEnte,
             StatoEnum stato
     ) {
-
-        StatoSegnalazione statoEntity = null;
-
-        if (stato != null) {
-            statoEntity = StatoSegnalazione.valueOf(stato.name());
-        }
-
-        return ResponseEntity.ok(
-                userService.getSegnalazioniByEnteAndStato(idEnte, statoEntity)
-        );
+        return ResponseEntity.ok(userService.getSegnalazioniByEnteAndStato(idEnte, stato));
     }
 
     @Override
     public ResponseEntity<SegnalazioniStatisticheOutput> getSegnalazioniStatsByEnte(Integer idEnte) {
-        return ResponseEntity.ok(
-                userService.getSegnalazioniStatistiche(idEnte)
-        );
+        return ResponseEntity.ok(userService.getSegnalazioniStatistiche(idEnte));
     }
 }
