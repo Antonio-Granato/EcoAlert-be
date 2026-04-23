@@ -31,8 +31,7 @@ public class AllegatoController implements AllegatiApi {
             @RequestParam("file") MultipartFile file
     ) {
         log.info("POST /segnalazione/{}/allegato", idSegnalazione);
-        AllegatoOutput output = allegatoService.caricaAllegato(idSegnalazione, file);
-        return ResponseEntity.status(HttpStatus.CREATED).body(output);
+        return ResponseEntity.status(HttpStatus.CREATED).body(allegatoService.caricaAllegato(idSegnalazione, file));
     }
 
     @Override
