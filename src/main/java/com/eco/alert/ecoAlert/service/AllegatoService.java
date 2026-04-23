@@ -9,7 +9,6 @@ import com.eco.alert.ecoAlert.exception.OperazioneNonPermessaException;
 import com.eco.alert.ecoAlert.exception.SegnalazioneNonTrovataException;
 import com.ecoalert.model.AllegatoOutput;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -20,31 +19,31 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.ZoneId;
-import java.util.List;
 
 @Service
 @Log4j2
 public class AllegatoService {
 
-    @Autowired
-    private AllegatoDao allegatoDao;
+    private final AllegatoDao allegatoDao;
+    private final SegnalazioneDao segnalazioneDao;
 
-    @Autowired
-    private SegnalazioneDao segnalazioneDao;
+    public AllegatoService(AllegatoDao allegatoDao, SegnalazioneDao segnalazioneDao) {
+        this.allegatoDao = allegatoDao;
+        this.segnalazioneDao = segnalazioneDao;
+    }
 
-    // ======================
-    // TROVA
-    // ======================
     @Transactional
     public AllegatoOutput caricaAllegato(Integer idSegnalazione, MultipartFile file) {
 
+        log.info("Upload allegato per segnalazione {}", idSegnalazione);
+
         if (file == null || file.isEmpty()) {
-            throw new OperazioneNonPermessaException("File vuoto");
+            throw new OperazioneNonPermessaException("File vuoto.");
         }
 
         SegnalazioneEntity segnalazione = segnalazioneDao.findById(idSegnalazione)
                 .orElseThrow(() ->
-                        new SegnalazioneNonTrovataException("Segnalazione non trovata")
+                        new SegnalazioneNonTrovataException("Segnalazione non trovata.")
                 );
 
         try {
@@ -56,6 +55,7 @@ public class AllegatoService {
             allegato.setSegnalazione(segnalazione);
 
             AllegatoEntity salvato = allegatoDao.save(allegato);
+
             log.info("Allegato {} caricato per segnalazione {}",
                     salvato.getId_allegato(), idSegnalazione);
 
@@ -67,6 +67,8 @@ public class AllegatoService {
     }
 
     public ResponseEntity<Resource> downloadAllegato(Integer idAllegato) {
+
+        log.info("Download allegato {}", idAllegato);
 
         AllegatoEntity allegato = allegatoDao.findById(idAllegato)
                 .orElseThrow(() ->
@@ -83,11 +85,10 @@ public class AllegatoService {
                 .body(resource);
     }
 
-    // ======================
-    // ELIMINA
-    // ======================
     @Transactional
     public void eliminaAllegato(Integer idAllegato) {
+
+        log.info("Eliminazione allegato {}", idAllegato);
 
         AllegatoEntity allegato = allegatoDao.findById(idAllegato)
                 .orElseThrow(() ->
@@ -98,9 +99,7 @@ public class AllegatoService {
         log.info("Allegato {} eliminato", idAllegato);
     }
 
-    // ======================
     // MAPPER
-    // ======================
     private AllegatoOutput toOutput(AllegatoEntity entity) {
 
         AllegatoOutput output = new AllegatoOutput();
@@ -108,11 +107,15 @@ public class AllegatoService {
         output.setNomeFile(entity.getNomeFile());
         output.setContentType(entity.getContentType());
         output.setIdSegnalazione(entity.getSegnalazione().getIdSegnalazione());
-        output.setDataCaricamento(
-                entity.getDataAllegato()
-                        .atZone(ZoneId.systemDefault())
-                        .toOffsetDateTime()
-        );
+
+        if (entity.getDataAllegato() != null) {
+            output.setDataCaricamento(
+                    entity.getDataAllegato()
+                            .atZone(ZoneId.systemDefault())
+                            .toOffsetDateTime()
+            );
+        }
+
         return output;
     }
 }
