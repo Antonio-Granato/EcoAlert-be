@@ -1,5 +1,6 @@
 package com.eco.alert.ecoAlert.service;
 
+import com.eco.alert.ecoAlert.config.SecurityUtils;
 import com.eco.alert.ecoAlert.dao.EnteDao;
 import com.eco.alert.ecoAlert.dao.SegnalazioneDao;
 import com.eco.alert.ecoAlert.dao.UtenteDao;
@@ -8,6 +9,7 @@ import com.eco.alert.ecoAlert.enums.StatoSegnalazione;
 import com.eco.alert.ecoAlert.exception.*;
 import com.ecoalert.model.*;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -26,14 +28,18 @@ public class SegnalazioneService {
     private final SegnalazioneDao segnalazioneDao;
     private final EnteDao enteDao;
     private final UtenteDao utenteDao;
+    private final SecurityUtils securityUtils;
 
     public SegnalazioneService(
             SegnalazioneDao segnalazioneDao,
             EnteDao enteDao,
-            UtenteDao utenteDao) {
+            UtenteDao utenteDao,
+            SecurityUtils securityUtils) {
+
         this.segnalazioneDao = segnalazioneDao;
         this.enteDao = enteDao;
         this.utenteDao = utenteDao;
+        this.securityUtils = securityUtils;
     }
 
     // =========================
@@ -64,8 +70,20 @@ public class SegnalazioneService {
         }
     }
 
+    @PreAuthorize("hasRole('CITTADINO')")
     @Transactional
-    public SegnalazioneOutput creaSegnalazione(Integer idUtente, SegnalazioneInput input) {
+    public SegnalazioneOutput creaSegnalazione(SegnalazioneInput input) {
+
+        Integer idUtente = securityUtils.getCurrentUserId();
+        log.info("ID UTENTE ESTRATTO: {}", idUtente);
+
+        SegnalazioneEntity entity = creaSegnalazioneInterno(idUtente, input);
+
+        return toOutput(entity);
+    }
+
+    @Transactional
+    public SegnalazioneEntity creaSegnalazioneInterno(Integer idUtente, SegnalazioneInput input) {
         log.info("Creazione segnalazione - userId={}, titolo={}", idUtente, input.getTitolo());
 
         if (idUtente == null)
@@ -83,9 +101,6 @@ public class SegnalazioneService {
         UtenteEntity utente = utenteDao.findById(idUtente)
                 .orElseThrow(() -> new UtenteNonTrovatoException("Utente con ID " + idUtente + " non trovato."));
 
-        if (!(utente instanceof CittadinoEntity))
-            throw new UtenteNonCittadinoException("Solo i cittadini possono creare segnalazioni");
-
         EnteEntity ente = enteDao.findById(input.getIdEnte())
                 .orElseThrow(() -> new EnteNonTrovatoException("Ente non trovato"));
 
@@ -94,7 +109,12 @@ public class SegnalazioneService {
         segnalazione.setDescrizione(input.getDescrizione());
         segnalazione.setLatitudine(input.getLatitudine());
         segnalazione.setLongitudine(input.getLongitudine());
-        segnalazione.setCittadino((CittadinoEntity) utente); // mapping corretto
+
+        if (!(utente instanceof CittadinoEntity cittadino)) {
+            throw new OperazioneNonPermessaException("Solo i cittadini possono creare segnalazioni");
+        }
+
+        segnalazione.setCittadino(cittadino);// mapping corretto
         segnalazione.setEnte(ente);
         segnalazione.setStato(StatoSegnalazione.INSERITO);
         segnalazione.setDataSegnalazione(LocalDateTime.now());
@@ -102,9 +122,10 @@ public class SegnalazioneService {
         SegnalazioneEntity salvata = segnalazioneDao.save(segnalazione);
         log.info("Segnalazione {} creata in stato {}", salvata.getIdSegnalazione(), salvata.getStato());
 
-        return toOutput(salvata);
+        return salvata;
     }
 
+    @PreAuthorize("hasRole('ENTE')")
     @Transactional
     public SegnalazioneOutput aggiornaStatoSegnalazione(
             Integer idEnte,
@@ -128,6 +149,8 @@ public class SegnalazioneService {
         if (segnalazione.getStato() == StatoSegnalazione.CHIUSO) {
             throw new StatoNonValidoException("La segnalazione è già chiusa");
         }
+
+        segnalazione.setStato(nuovoStato);
 
         // Aggiornamento ditta
         if (input.getDitta() != null && !input.getDitta().isBlank()) {
@@ -253,7 +276,17 @@ public class SegnalazioneService {
         throw new AccessoNonAutorizzatoException("Ruolo utente non valido");
     }
 
-    public SegnalazioneOutput getSegnalazioneById(Integer idUtente, Integer idSegnalazione) {
+    public SegnalazioneOutput getSegnalazioneById(Integer idSegnalazione) {
+
+        Integer idUtente = securityUtils.getCurrentUserId();
+        log.info("ID UTENTE ESTRATTO: {}", idUtente);
+
+        SegnalazioneEntity entity = getSegnalazioneByIdInterno(idUtente, idSegnalazione);
+
+        return toOutput(entity);
+    }
+
+    public SegnalazioneEntity getSegnalazioneByIdInterno(Integer idUtente, Integer idSegnalazione) {
 
         // Recupera la segnalazione
         SegnalazioneEntity segnalazione = segnalazioneDao.findById(idSegnalazione)
@@ -276,16 +309,23 @@ public class SegnalazioneService {
             throw new AccessoNonAutorizzatoException("Tipo utente non autorizzato");
         }
 
-        return toOutput(segnalazione);
+        return segnalazione;
     }
 
-    public void cancellaSegnalazione(Integer id, Integer idSegnalazione) throws OperazioneNonPermessaException {
+    @PreAuthorize("hasRole('CITTADINO')")
+    public void cancellaSegnalazione(Integer idSegnalazione) {
+
+        Integer idUtente = securityUtils.getCurrentUserId();
+        log.info("ID UTENTE ESTRATTO: {}", idUtente);
+
+        cancellaSegnalazioneInterno(idUtente, idSegnalazione);
+    }
+
+    @PreAuthorize("hasRole('CITTADINO')")
+    public void cancellaSegnalazioneInterno(Integer id, Integer idSegnalazione) throws OperazioneNonPermessaException {
 
         UtenteEntity utente = utenteDao.findById(id)
                 .orElseThrow(() -> new UtenteNonTrovatoException("Utente con ID : " + id + " non trovato."));
-        if (!(utente instanceof CittadinoEntity)) {
-            throw new UtenteNonCittadinoException("Solo i cittadini possono eliminare una segnalazione.");
-        }
 
         SegnalazioneEntity segnalazione = segnalazioneDao.findById(idSegnalazione)
                 .orElseThrow(() -> new SegnalazioneNonTrovataException("Segnalazione con ID : " + idSegnalazione + " non trovata."));
@@ -303,8 +343,23 @@ public class SegnalazioneService {
         segnalazioneDao.delete(segnalazione);
     }
 
+    @PreAuthorize("hasRole('CITTADINO')")
     @Transactional
-    public SegnalazioneOutput modificaSegnalazione(Integer id, Integer idSegnalazione, SegnalazioneInput input) {
+    public SegnalazioneOutput modificaSegnalazione(
+            Integer idSegnalazione,
+            SegnalazioneInput input
+    ) {
+        Integer idUtente = securityUtils.getCurrentUserId();
+        log.info("ID UTENTE ESTRATTO: {}", idUtente);
+
+        SegnalazioneEntity entity = modificaSegnalazioneInterno(idUtente, idSegnalazione, input);
+
+        return toOutput(entity);
+    }
+
+    @PreAuthorize("hasRole('CITTADINO')")
+    @Transactional
+    public SegnalazioneEntity modificaSegnalazioneInterno(Integer id, Integer idSegnalazione, SegnalazioneInput input) {
 
         UtenteEntity utente = utenteDao.findById(id)
                 .orElseThrow(() ->
@@ -341,6 +396,6 @@ public class SegnalazioneService {
         }
 
         SegnalazioneEntity salvata = segnalazioneDao.save(segnalazione);
-        return toOutput(salvata);
+        return salvata;
     }
 }

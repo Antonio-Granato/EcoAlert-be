@@ -8,12 +8,16 @@ import com.eco.alert.ecoAlert.entity.EnteEntity;
 import com.eco.alert.ecoAlert.entity.SegnalazioneEntity;
 import com.eco.alert.ecoAlert.entity.UtenteEntity;
 import com.eco.alert.ecoAlert.dao.UtenteDao;
+import com.eco.alert.ecoAlert.enums.Ruolo;
 import com.eco.alert.ecoAlert.enums.StatoSegnalazione;
 import com.eco.alert.ecoAlert.exception.*;
 import com.ecoalert.model.*;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,13 +30,17 @@ public class UserService {
     private final EnteDao enteDao;
     private final SegnalazioneDao segnalazioneDao;
     private final SegnalazioneService segnalazioneService;
+    private final BCryptPasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
-    public UserService(UtenteDao utenteDao, CittadinoDao cittadinoDao, EnteDao enteDao, SegnalazioneDao segnalazioneDao, SegnalazioneService segnalazioneService) {
+    public UserService(UtenteDao utenteDao, CittadinoDao cittadinoDao, EnteDao enteDao, SegnalazioneDao segnalazioneDao, SegnalazioneService segnalazioneService, BCryptPasswordEncoder passwordEncoder, JwtService jwtService) {
         this.utenteDao = utenteDao;
         this.cittadinoDao = cittadinoDao;
         this.enteDao = enteDao;
         this.segnalazioneDao = segnalazioneDao;
         this.segnalazioneService = segnalazioneService;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
     }
 
     // HELPER METHODS PRIVATE
@@ -42,9 +50,9 @@ public class UserService {
         output.setEmail(utente.getEmail());
 
         if (utente instanceof CittadinoEntity) {
-            output.setRuolo("Cittadino");
+            output.setRuolo(Ruolo.CITTADINO.name());
         } else if (utente instanceof EnteEntity) {
-            output.setRuolo("Ente");
+            output.setRuolo(Ruolo.ENTE.name());
         }
 
         return output;
@@ -62,36 +70,6 @@ public class UserService {
         }
     }
 
-    public UtenteOutput creaUtente(UtenteInput input) {
-
-        log.info("Creazione utente email={}, ruolo={}", input.getEmail(), input.getRuolo());
-
-        if (input.getEmail() == null || input.getEmail().isBlank()) {
-            throw new IdODatiMancantiException("Email obbligatoria.");
-        }
-
-        if (input.getPassword() == null || input.getPassword().length() < 6) {
-            throw new IdODatiMancantiException("Password non valida.");
-        }
-
-        UtenteEntity utenteConStessaMail = utenteDao.findByEmail(input.getEmail());
-        if (utenteConStessaMail != null) {
-            throw new EmailDuplicataException();
-        }
-
-        String ruolo = input.getRuolo();
-
-        if ("cittadino".equalsIgnoreCase(ruolo)) {
-            return creaCittadino(input);
-        }
-
-        if ("ente".equalsIgnoreCase(ruolo)) {
-            return creaEnte(input);
-        }
-
-        throw new OperazioneNonPermessaException("Ruolo non valido.");
-    }
-
     private UtenteOutput creaCittadino(UtenteInput input) {
 
         if (input.getNome() == null || input.getCognome() == null) {
@@ -107,7 +85,7 @@ public class UserService {
 
         CittadinoEntity cittadino = new CittadinoEntity();
         cittadino.setEmail(input.getEmail());
-        cittadino.setPassword(input.getPassword());
+        cittadino.setPassword(passwordEncoder.encode(input.getPassword()));
         cittadino.setNome(input.getNome());
         cittadino.setCognome(input.getCognome());
         cittadino.setCitta(input.getCitta());
@@ -142,7 +120,7 @@ public class UserService {
         }
         EnteEntity ente = new EnteEntity();
         ente.setEmail(input.getEmail());
-        ente.setPassword(input.getPassword());
+        ente.setPassword(passwordEncoder.encode(input.getPassword()));
         ente.setNomeEnte(nomeEnte);
         ente.setCittaEnte(input.getCitta());
 
@@ -154,30 +132,73 @@ public class UserService {
     private boolean isEmailIstituzionale(String email) {
         String lower = email.toLowerCase();
 
-        return lower.endsWith(".gov.it")
-                || lower.contains("@comune.")
-                || lower.endsWith(".it");
+        return lower.endsWith(".gov.it") || lower.contains("@comune.");
     }
 
+    @PreAuthorize("permitAll()")
+    @Transactional
+    public UtenteOutput creaUtente(UtenteInput input) {
+
+        log.info("Creazione utente email={}, ruolo={}", input.getEmail(), input.getRuolo());
+
+        if (input.getEmail() == null || input.getEmail().isBlank()) {
+            throw new IdODatiMancantiException("Email obbligatoria.");
+        }
+
+        if (input.getPassword() == null || input.getPassword().length() < 8) {
+            throw new IdODatiMancantiException("Password non valida.");
+        }
+
+        UtenteEntity utenteConStessaMail = utenteDao.findByEmail(input.getEmail());
+        if (utenteConStessaMail != null) {
+            throw new EmailDuplicataException();
+        }
+
+        Ruolo ruolo;
+        try {
+            ruolo = Ruolo.valueOf(input.getRuolo().toUpperCase());
+        } catch (Exception e) {
+            throw new OperazioneNonPermessaException("Ruolo non valido.");
+        }
+
+        return switch (ruolo) {
+            case CITTADINO -> creaCittadino(input);
+            case ENTE -> creaEnte(input);
+        };
+    }
+
+    @PreAuthorize("permitAll()")
+    @Transactional
     public LoginOutput login (LoginInput loginInput) {
         log.info("Login Utente...");
 
+        if (loginInput.getEmail() == null || loginInput.getPassword() == null) {
+            throw new LoginException("Email o password mancanti");
+        }
+
         UtenteEntity utente = utenteDao.findByEmail(loginInput.getEmail());
         if(utente == null){
-            throw new LoginException("Email non presente nel database.");
+            throw new LoginException("Credenziali non valide");
         }
 
-        if(!utente.getPassword().equals(loginInput.getPassword())){
-            throw new LoginException("Password Errata.");
+        if(!passwordEncoder.matches(loginInput.getPassword(), utente.getPassword())){
+            throw new LoginException("Credenziali non valide");
         }
 
-        String ruolo = (utente instanceof CittadinoEntity) ? "cittadino" : "ente";
+        Ruolo ruolo = (utente instanceof CittadinoEntity)
+                ? Ruolo.CITTADINO
+                : Ruolo.ENTE;
+        String token = jwtService.generateToken(utente.getId(), ruolo.name());
+
         LoginOutput output = new LoginOutput();
-        output.setRuolo(ruolo);
+        output.setToken(token);
+        output.setRuolo(ruolo.name());
         output.setUserId(utente.getId());
         return output;
     }
 
+    @PreAuthorize("#id == authentication.principal") //solo proprietario
+    @Transactional
     public UtenteDettaglioOutput getUserById(Integer id) {
         log.info("Recupero utente con ID {}", id);
 
@@ -191,7 +212,7 @@ public class UserService {
 
         // Controlla il tipo effettivo dell’utente
         if (utente instanceof CittadinoEntity cittadino) {
-            output.setRuolo("cittadino");
+            output.setRuolo(Ruolo.CITTADINO.name());
             output.setCognome(cittadino.getCognome());
             output.setNome(cittadino.getNome());
             output.setCitta(cittadino.getCitta());
@@ -199,7 +220,7 @@ public class UserService {
             output.setEmail(utente.getEmail());
             output.setNumeroTelefono(cittadino.getNumeroTelefono());
         } else if (utente instanceof EnteEntity ente) {
-            output.setRuolo("ente");
+            output.setRuolo(Ruolo.ENTE.name());
             output.setNomeEnte(ente.getNomeEnte());
             output.setCitta(ente.getCittaEnte());
         }
@@ -207,6 +228,8 @@ public class UserService {
         return output;
     }
 
+    @PreAuthorize("hasRole('CITTADINO')")
+    @Transactional
     public List<EnteOutput> getAllEnti() {
         List<EnteEntity> enti = enteDao.findAll();
         List<EnteOutput> result = new ArrayList<>();
@@ -222,6 +245,8 @@ public class UserService {
         return result;
     }
 
+    @PreAuthorize("#id == authentication.principal")
+    @Transactional
     public void deleteUser(Integer id) {
         UtenteEntity utente = utenteDao.findById(id)
                 .orElseThrow(() -> new UtenteNonTrovatoException("Utente non trovato."));
@@ -250,14 +275,20 @@ public class UserService {
         }
     }
 
+    @PreAuthorize("#id == authentication.principal")
+    @Transactional
     public UtenteDettaglioOutput updateUser(Integer id, UtenteUpdateInput input) {
         UtenteEntity utente = utenteDao.findById(id)
                 .orElseThrow(() -> new UtenteNonTrovatoException("Utente non trovato"));
 
-        UtenteEntity existing = utenteDao.findByEmail(input.getEmail());
+        if (input.getEmail() != null) {
+            UtenteEntity existing = utenteDao.findByEmail(input.getEmail());
 
-        if (existing != null && !existing.getId().equals(id)) {
-            throw new EmailDuplicataException();
+            if (existing != null && !existing.getId().equals(id)) {
+                throw new EmailDuplicataException();
+            }
+
+            utente.setEmail(input.getEmail());
         }
 
         if (utente instanceof CittadinoEntity cittadino) {
@@ -277,11 +308,16 @@ public class UserService {
             enteDao.save(ente);
         }
 
+        if (input.getPassword() != null && !input.getPassword().isBlank()) {
+            utente.setPassword(passwordEncoder.encode(input.getPassword()));
+        }
+
         utenteDao.save(utente);
 
         return getUserById(id);
     }
 
+    @PreAuthorize("#idEnte == authentication.principal")
     @Transactional
     public List<SegnalazioneOutput> getSegnalazioniByEnteAndStato(
             Integer idEnte,
@@ -300,6 +336,8 @@ public class UserService {
         return segnalazioni.stream().map(segnalazioneService::toOutput).toList();
     }
 
+    @PreAuthorize("#idEnte == authentication.principal")
+    @Transactional
     public SegnalazioniStatisticheOutput getSegnalazioniStatistiche(Integer idEnte){
 
         List<Object[]> result = segnalazioneDao.countSegnalazioniByStato(idEnte);

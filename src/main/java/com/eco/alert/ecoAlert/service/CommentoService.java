@@ -1,5 +1,6 @@
 package com.eco.alert.ecoAlert.service;
 
+import com.eco.alert.ecoAlert.config.SecurityUtils;
 import com.eco.alert.ecoAlert.dao.CommentoDao;
 import com.eco.alert.ecoAlert.dao.SegnalazioneDao;
 import com.eco.alert.ecoAlert.dao.UtenteDao;
@@ -8,8 +9,10 @@ import com.eco.alert.ecoAlert.exception.*;
 import com.ecoalert.model.CommentoInput;
 import com.ecoalert.model.CommentoOutput;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -21,22 +24,24 @@ public class CommentoService {
     private final CommentoDao commentoDao;
     private final UtenteDao utenteDao;
     private final SegnalazioneDao segnalazioneDao;
+    private final SecurityUtils securityUtils;
 
-    public CommentoService(CommentoDao commentoDao, UtenteDao utenteDao, SegnalazioneDao segnalazioneDao) {
+    public CommentoService(CommentoDao commentoDao, UtenteDao utenteDao, SegnalazioneDao segnalazioneDao, SecurityUtils securityUtils) {
         this.commentoDao = commentoDao;
         this.utenteDao = utenteDao;
         this.segnalazioneDao = segnalazioneDao;
+        this.securityUtils = securityUtils;
     }
 
     // HELPER
     private void checkAutorizzazione(UtenteEntity utente, SegnalazioneEntity segnalazione) {
 
-        if (utente instanceof CittadinoEntity) {
-            if (!segnalazione.getCittadino().getId().equals(utente.getId())) {
+        if (utente instanceof CittadinoEntity cittadino) {
+            if (!segnalazione.getCittadino().getId().equals(cittadino.getId())) {
                 throw new OperazioneNonPermessaException("Il cittadino non può commentare questa segnalazione");
             }
-        } else if (utente instanceof EnteEntity) {
-            if (!segnalazione.getEnte().getId().equals(utente.getId())) {
+        } else if (utente instanceof EnteEntity ente) {
+            if (!segnalazione.getEnte().getId().equals(ente.getId())) {
                 throw new OperazioneNonPermessaException("L'ente non può commentare questa segnalazione");
             }
         } else {
@@ -65,52 +70,52 @@ public class CommentoService {
         return output;
     }
 
-    // API
-    @Transactional
-    public CommentoOutput creaCommentoResponse(
-            Integer idUtente,
-            Integer idSegnalazione,
-            CommentoInput commentoInput
-    ) {
-        CommentoEntity entity = creaCommento(idUtente, idSegnalazione, commentoInput);
-
-        return toOutput(entity);
-    }
-
     // BUSINESS
+    @PreAuthorize("hasAnyRole('CITTADINO','ENTE')")
     @Transactional
-    public CommentoEntity creaCommento(Integer idUtente, Integer idSegnalazione, CommentoInput commentoInput) {
+    public CommentoOutput creaCommento(Integer idSegnalazione, CommentoInput input) {
 
-        if (idUtente == null || idSegnalazione == null) {
-            throw new IdODatiMancantiException("ID mancanti.");
+        Integer idUtente = securityUtils.getCurrentUserId();
+
+        if (idSegnalazione == null) {
+            throw new IdODatiMancantiException("ID segnalazione mancante.");
+        }
+
+        if (input == null || !StringUtils.hasText(input.getDescrizione())) {
+            throw new IdODatiMancantiException("Descrizione commento obbligatoria.");
         }
 
         log.info("Creazione commento - utente={}, segnalazione={}", idUtente, idSegnalazione);
 
-        if (commentoInput == null || commentoInput.getDescrizione() == null || commentoInput.getDescrizione().isBlank()) {
-            throw new IdODatiMancantiException("Descrizione commento obbligatoria.");
-        }
-
         UtenteEntity utente = utenteDao.findById(idUtente)
-                .orElseThrow(() -> new UtenteNonTrovatoException("Utente non trovato con ID: " + idUtente));
+                .orElseThrow(() -> new UtenteNonTrovatoException("Utente non trovato"));
 
         SegnalazioneEntity segnalazione = segnalazioneDao.findById(idSegnalazione)
-                .orElseThrow(() -> new SegnalazioneNonTrovataException("Segnalazione non trovata con ID: " + idSegnalazione));
+                .orElseThrow(() -> new SegnalazioneNonTrovataException("Segnalazione non trovata"));
 
         checkAutorizzazione(utente, segnalazione);
 
         CommentoEntity commento = new CommentoEntity();
-        commento.setDescrizione(commentoInput.getDescrizione());
+        commento.setDescrizione(input.getDescrizione());
         commento.setUtente(utente);
         commento.setSegnalazione(segnalazione);
         commento.setDataCommento(LocalDateTime.now());
 
-        return commentoDao.save(commento);
+        return toOutput(commentoDao.save(commento));
     }
 
-    public void cancellaCommento(Integer idUtente, Integer idSegnalazione, Integer idCommento) {
+    @PreAuthorize("isAuthenticated()")
+    @Transactional
+    public void cancellaCommento(Integer idSegnalazione, Integer idCommento) {
 
-        log.info("Eliminazione commento - utente={}, commento={}", idUtente, idCommento);
+        Integer idUtente = securityUtils.getCurrentUserId();
+
+        if (idSegnalazione == null || idCommento == null) {
+            throw new IdODatiMancantiException("ID mancanti");
+        }
+
+        log.info("Eliminazione commento - utente={}, segnalazione={}, commento={}",
+                idUtente, idSegnalazione, idCommento);
 
         CommentoEntity commento = commentoDao.findById(idCommento)
                 .orElseThrow(() -> new CommentoNonTrovatoException("Commento non trovato"));

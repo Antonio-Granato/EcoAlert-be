@@ -98,6 +98,13 @@ public class ExceptionController {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Error> handleGenericException(Exception ex) {
-        return buildError("Errore interno.", "Si è verificato un errore.", HttpStatus.INTERNAL_SERVER_ERROR);
+
+        ex.printStackTrace(); // 🔥 fondamentale
+
+        return buildError(
+                ex.getClass().getSimpleName(),  // tipo errore
+                ex.getMessage(),                // messaggio reale
+                HttpStatus.INTERNAL_SERVER_ERROR
+        );
     }
 }

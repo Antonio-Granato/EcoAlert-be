@@ -1,10 +1,12 @@
 package com.eco.alert.ecoAlert.service;
 
+import com.eco.alert.ecoAlert.config.SecurityUtils;
 import com.eco.alert.ecoAlert.dao.AllegatoDao;
 import com.eco.alert.ecoAlert.dao.SegnalazioneDao;
 import com.eco.alert.ecoAlert.entity.AllegatoEntity;
 import com.eco.alert.ecoAlert.entity.SegnalazioneEntity;
 import com.eco.alert.ecoAlert.exception.AllegatoNonTrovatoException;
+import com.eco.alert.ecoAlert.exception.IdODatiMancantiException;
 import com.eco.alert.ecoAlert.exception.OperazioneNonPermessaException;
 import com.eco.alert.ecoAlert.exception.SegnalazioneNonTrovataException;
 import com.ecoalert.model.AllegatoOutput;
@@ -13,6 +15,7 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,12 +29,15 @@ public class AllegatoService {
 
     private final AllegatoDao allegatoDao;
     private final SegnalazioneDao segnalazioneDao;
+    private final SecurityUtils securityUtils;
 
-    public AllegatoService(AllegatoDao allegatoDao, SegnalazioneDao segnalazioneDao) {
+    public AllegatoService(AllegatoDao allegatoDao, SegnalazioneDao segnalazioneDao, SecurityUtils securityUtils) {
         this.allegatoDao = allegatoDao;
         this.segnalazioneDao = segnalazioneDao;
+        this.securityUtils = securityUtils;
     }
 
+    @PreAuthorize("hasRole('CITTADINO')")
     @Transactional
     public AllegatoOutput caricaAllegato(Integer idSegnalazione, MultipartFile file) {
 
@@ -41,10 +47,16 @@ public class AllegatoService {
             throw new OperazioneNonPermessaException("File vuoto.");
         }
 
+        Integer userId = securityUtils.getCurrentUserId();
+
         SegnalazioneEntity segnalazione = segnalazioneDao.findById(idSegnalazione)
                 .orElseThrow(() ->
                         new SegnalazioneNonTrovataException("Segnalazione non trovata.")
                 );
+
+        if (!segnalazione.getCittadino().getId().equals(userId) ) {
+            throw new OperazioneNonPermessaException("Non autorizzato");
+        }
 
         try {
             AllegatoEntity allegato = new AllegatoEntity();
@@ -66,14 +78,33 @@ public class AllegatoService {
         }
     }
 
+    @PreAuthorize("hasAnyRole('CITTADINO','ENTE')")
     public ResponseEntity<Resource> downloadAllegato(Integer idAllegato) {
 
-        log.info("Download allegato {}", idAllegato);
+        if (idAllegato == null) {
+            throw new IdODatiMancantiException("ID allegato mancante");
+        }
+
+        Integer userId = securityUtils.getCurrentUserId();
+
+        log.info("Download allegato {} da utente {}", idAllegato, userId);
 
         AllegatoEntity allegato = allegatoDao.findById(idAllegato)
                 .orElseThrow(() ->
                         new AllegatoNonTrovatoException("Allegato non trovato")
                 );
+
+        SegnalazioneEntity segnalazioneEntity = allegato.getSegnalazione();
+
+        if (segnalazioneEntity == null) {
+            throw new IdODatiMancantiException("ID segnalazione mancante");
+        }
+
+        // Controllo autorizzazione
+        if (!segnalazioneEntity.getCittadino().getId().equals(userId)
+                && !segnalazioneEntity.getEnte().getId().equals(userId)) {
+            throw new OperazioneNonPermessaException("Non sei autorizzato");
+        }
 
         ByteArrayResource resource =
                 new ByteArrayResource(allegato.getFileData());
@@ -85,17 +116,31 @@ public class AllegatoService {
                 .body(resource);
     }
 
+    @PreAuthorize("isAuthenticated()")
     @Transactional
     public void eliminaAllegato(Integer idAllegato) {
 
-        log.info("Eliminazione allegato {}", idAllegato);
+        Integer userId = securityUtils.getCurrentUserId();
 
-        AllegatoEntity allegato = allegatoDao.findById(idAllegato)
+        log.info("Eliminazione allegato {} da utente {}", idAllegato, userId);
+
+        AllegatoEntity allegatoEntity = allegatoDao.findById(idAllegato)
                 .orElseThrow(() ->
                         new AllegatoNonTrovatoException("Allegato non trovato")
                 );
 
-        allegatoDao.delete(allegato);
+        SegnalazioneEntity segnalazioneEntity = allegatoEntity.getSegnalazione();
+
+        if (segnalazioneEntity == null) {
+            throw new IdODatiMancantiException("ID segnalazione mancante");
+        }
+
+        if (!segnalazioneEntity.getCittadino().getId().equals(userId)) {
+            throw  new OperazioneNonPermessaException("Non autorizzato");
+        }
+
+        allegatoDao.delete(allegatoEntity);
+
         log.info("Allegato {} eliminato", idAllegato);
     }
 

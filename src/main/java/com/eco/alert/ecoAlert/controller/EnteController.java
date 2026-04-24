@@ -16,8 +16,11 @@ import java.util.List;
 @RestController
 public class EnteController implements EntiApi {
 
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
+
+    public EnteController(UserService userService) {
+        this.userService = userService;
+    }
 
     @Override
     public ResponseEntity<List<EnteOutput>> getAllEnti() {

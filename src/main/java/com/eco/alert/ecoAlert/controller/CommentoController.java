@@ -6,7 +6,6 @@ import com.ecoalert.model.CommentoInput;
 import com.ecoalert.model.CommentoOutput;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @Log4j2
@@ -20,22 +19,19 @@ public class CommentoController implements CommentiApi {
     }
 
     @Override
-    public ResponseEntity<CommentoOutput> createCommento(
-            Integer id,
+    public ResponseEntity<CommentoOutput> createCommento (
             Integer idSegnalazione,
-            @RequestBody CommentoInput commentoInput
+            CommentoInput commentoInput
     ) {
-        CommentoOutput commentoOutput = commentoService.creaCommentoResponse(id, idSegnalazione, commentoInput);
-        return ResponseEntity.status(201).body(commentoOutput);
+        return ResponseEntity.ok(commentoService.creaCommento(idSegnalazione, commentoInput));
     }
 
     @Override
-    public ResponseEntity<Void> deleteCommento(
-            Integer id,
+    public ResponseEntity<Void> deleteCommento (
             Integer idSegnalazione,
             Integer idCommento
     ) {
-        commentoService.cancellaCommento(id, idSegnalazione, idCommento);
+        commentoService.cancellaCommento(idSegnalazione, idCommento);
         return ResponseEntity.noContent().build();
     }
 }

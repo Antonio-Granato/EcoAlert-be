@@ -6,7 +6,6 @@ import com.ecoalert.model.LoginInput;
 import com.ecoalert.model.LoginOutput;
 import com.ecoalert.model.UtenteInput;
 import com.ecoalert.model.UtenteOutput;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -14,8 +13,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class AuthController implements AuthApi {
 
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
+
+    public AuthController(UserService userService) {
+        this.userService = userService;
+    }
 
     @Override
     public ResponseEntity<LoginOutput> login(@RequestBody LoginInput loginInput) {

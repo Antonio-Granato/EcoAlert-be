@@ -4,6 +4,9 @@ info:
   version: 1.0.0
   description: API per la gestione utenti, autenticazione e home page
 
+security:
+  - bearerAuth: []
+
 tags:
   - name: Segnalazioni
     description: Operazioni sulle segnalazioni ambientali
@@ -54,6 +57,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AllegatoOutput'
+
   /allegati/{idAllegato}:
     get:
       tags:
@@ -81,7 +85,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /allegati/{idAllegato}/allegato:
     delete:
       tags:
         - Allegati
@@ -109,7 +112,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /user/{id}/segnalazione/{idSegnalazione}/commenti:
+  /segnalazioni/{idSegnalazione}/commenti:
     post:
       tags:
         - Commenti
@@ -117,11 +120,6 @@ paths:
       description: Cittadini o enti possono aggiungere commenti solo alle segnalazioni associate ai loro ID.
       operationId: createCommento
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
         - name: idSegnalazione
           in: path
           required: true
@@ -217,7 +215,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/SegnalazioneOutput'
 
-  /user/{id}/segnalazione/{idSegnalazione}/commenti/{idCommento}:
+  /segnalazioni/{idSegnalazione}/commenti/{idCommento}:
     delete:
       tags:
         - Commenti
@@ -226,11 +224,6 @@ paths:
         L'utente può eliminare solo i propri commenti sotto la segnalazione.
       operationId: deleteCommento
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
         - name: idSegnalazione
           in: path
           required: true
@@ -257,8 +250,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-
-  /user/{id}:
+  /utente/me:
     delete:
       tags:
         - Utenti
@@ -267,12 +259,6 @@ paths:
         Permette di eliminare un utente, sia cittadino che ente.
         L'eliminazione potrebbe fallire se esistono segnalazioni ancora attive.
       operationId: deleteUser
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
       responses:
         '204':
           description: Utente eliminato con successo
@@ -293,13 +279,7 @@ paths:
       tags:
         - Utenti
       summary: Ottiene i dettagli di un utente
-      operationId: getUserById
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
+      operationId: getMe
       responses:
         '200':
           description: Utente trovato
@@ -325,12 +305,6 @@ paths:
         - Utenti
       summary: Modifica dati utente
       operationId: updateUser
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
       requestBody:
         required: true
         content:
@@ -347,7 +321,7 @@ paths:
         '404':
           description: Utente non trovato
 
-  /user/{id}/segnalazioni/{idSegnalazione}:
+  /utente/me/segnalazioni/{idSegnalazione}:
     delete:
       tags:
         - Segnalazioni
@@ -357,11 +331,6 @@ paths:
         Un ente non può eliminare alcuna segnalazione.
       operationId: deleteSegnalazione
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
         - name: idSegnalazione
           in: path
           required: true
@@ -398,11 +367,6 @@ paths:
         Solo il titolo, la descrizione, la latitudine, la longitudine e l'ente associato possono essere aggiornati.
       operationId: updateSegnalazione
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
         - name: idSegnalazione
           in: path
           required: true
@@ -442,7 +406,7 @@ paths:
 
     get:
       tags:
-        - Utenti
+        - Segnalazioni
       summary: Ottiene il dettaglio di una segnalazione
       description: >
         Restituisce una segnalazione specifica.
@@ -450,12 +414,6 @@ paths:
         - Un ente può vedere solo le segnalazioni associate a sé.
       operationId: getSegnalazioneById
       parameters:
-        - name: id
-          in: path
-          required: true
-          description: ID dell'utente
-          schema:
-            type: integer
         - name: idSegnalazione
           in: path
           required: true
@@ -482,35 +440,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /user/{id}/segnalazioni:
-    get:
-      tags:
-        - Utenti
-      summary: Ottiene le segnalazioni associate all’utente
-      operationId: getSegnalazioniByUserId
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: Lista segnalazioni
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/SegnalazioneOutput'
-        '404':
-          description: Utente non trovato
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /segnalazioni/{idSegnalazione}/ente:
+  /segnalazioni/{idSegnalazione}/ente/{idEnte}:
     put:
       tags:
         - Segnalazioni
@@ -526,7 +456,7 @@ paths:
           schema:
             type: integer
         - name: idEnte
-          in: query
+          in: path
           required: true
           schema:
             type: integer
@@ -586,6 +516,7 @@ paths:
 
   /login:
     post:
+      security: []
       tags:
         - Auth
       summary: Effettua il login dell'utente
@@ -618,6 +549,7 @@ paths:
 
   /sign-in:
     post:
+      security: []
       tags:
         - Auth
       summary: Registra un nuovo utente
@@ -648,18 +580,33 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /user/{id}/segnalazione:
+  /utente/me/segnalazioni:
+    get:
+      tags:
+        - Segnalazioni
+      summary: Ottiene le segnalazioni associate all’utente
+      operationId: getMySegnalazioni
+      responses:
+        '200':
+          description: Lista segnalazioni
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SegnalazioneOutput'
+        '404':
+          description: Utente non trovato
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
     post:
       tags:
         - Segnalazioni
       summary: Crea una nuova segnalazione
       operationId: createSegnalazione
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
       requestBody:
         required: true
         content:
@@ -693,6 +640,12 @@ paths:
                 $ref: '#/components/schemas/Error'
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
     EnteOutput:
       type: object
@@ -931,6 +884,8 @@ components:
         numeroTelefono:
           type: string
         email:
+          type: string
+        password:
           type: string
 
     SegnalazioniStatisticheOutput:

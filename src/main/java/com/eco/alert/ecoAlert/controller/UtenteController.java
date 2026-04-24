@@ -1,56 +1,57 @@
 package com.eco.alert.ecoAlert.controller;
 
-import com.eco.alert.ecoAlert.entity.SegnalazioneEntity;
-import com.eco.alert.ecoAlert.service.SegnalazioneService;
+import com.eco.alert.ecoAlert.config.SecurityUtils;
 import com.eco.alert.ecoAlert.service.UserService;
 import com.ecoalert.api.UtentiApi;
 import com.ecoalert.model.*;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import java.util.List;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @Log4j2
 public class UtenteController implements UtentiApi {
 
-    @Autowired
-    private UserService utenteService;
+    private final UserService utenteService;
+    private final SecurityUtils securityUtils;
 
-    @Autowired
-    private SegnalazioneService segnalazioneService;
-
-    @Override
-    public ResponseEntity<UtenteDettaglioOutput> getUserById(Integer id) {
-        log.info("Richiesta dettaglio utente con ID {}", id);
-        return ResponseEntity.ok(utenteService.getUserById(id));
+    public UtenteController(UserService userService, SecurityUtils securityUtils) {
+        this.utenteService = userService;
+        this.securityUtils = securityUtils;
     }
 
     @Override
-    public ResponseEntity<List<SegnalazioneOutput>> getSegnalazioniByUserId(Integer id) {
-        log.info("Richiesta lista segnalazioni dell'utente con ID {}", id);
-        return ResponseEntity.ok(segnalazioneService.getSegnalazioniByUserId(id));
-    }
+    public ResponseEntity<UtenteDettaglioOutput> getMe() {
+        Integer idUtente = securityUtils.getCurrentUserId();
 
+        log.info("GET /utente/me - userId={}", idUtente);
 
-    @Override
-    public ResponseEntity<SegnalazioneOutput> getSegnalazioneById(Integer id, Integer idSegnalazione) {
-        log.info("Richiesta dettaglio segnalazione {} per utente {}", idSegnalazione, id);
-        return ResponseEntity.ok(segnalazioneService.getSegnalazioneById(id, idSegnalazione));
+        return ResponseEntity.ok(
+                utenteService.getUserById(idUtente)
+        );
     }
 
     @Override
-    public ResponseEntity<Void> deleteUser(Integer id){
-        utenteService.deleteUser(id);
+    public ResponseEntity<Void> deleteUser() {
+        Integer idUtente = securityUtils.getCurrentUserId();
+
+        log.info("DELETE /utente/me - userId={}", idUtente);
+
+        utenteService.deleteUser(idUtente);
+
         return ResponseEntity.noContent().build();
     }
 
     @Override
     public ResponseEntity<UtenteDettaglioOutput> updateUser(
-            Integer id,
-            UtenteUpdateInput utenteUpdateInput
+            UtenteUpdateInput input
     ) {
-        return ResponseEntity.ok(utenteService.updateUser(id, utenteUpdateInput));
+        Integer idUtente = securityUtils.getCurrentUserId();
+
+        log.info("PUT /utente/me - userId={}", idUtente);
+
+        return ResponseEntity.ok(
+                utenteService.updateUser(idUtente, input)
+        );
     }
 }
