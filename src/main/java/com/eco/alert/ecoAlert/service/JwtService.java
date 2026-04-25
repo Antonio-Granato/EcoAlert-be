@@ -19,16 +19,19 @@ public class JwtService {
 
     // GENERAZIONE TOKEN
     public String generateToken(Integer userId, String ruolo) {
-        return Jwts.builder()
-                .claim("userId", userId)
-                .claim("role", ruolo)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 86400000))
-                .signWith(key)
-                .compact();
+        return Jwts.builder()   // crea JWT
+                .claim("userId", userId)    // payload
+                .claim("role", ruolo)       // payload
+                .setIssuedAt(new Date())          // quando è stato creato
+                .setExpiration(new Date(System.currentTimeMillis() + 86400000)) //scade dopo 24h
+                .signWith(key)     // crea la signitura usa la tua chiave
+                .compact();        // genera stringa finale
     }
 
     // PARSING PER CLAIMS
+    /* verifica firma
+    *  verifica scadenza
+    * decodifica payload */
     private Claims extractAllClaims(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(key)
@@ -37,7 +40,7 @@ public class JwtService {
                 .getBody();
     }
 
-    // CLAIMS
+    // CLAIMS legge dal payload
     public Integer extractUserId(String token) {
         return extractAllClaims(token).get("userId", Integer.class);
     }

@@ -36,7 +36,7 @@ public class SecurityConfig {
                 // niente CSRF (API REST)
                 .csrf(csrf -> csrf.disable())
 
-                // JWT = stateless
+                // JWT = stateless niente sessioni
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 

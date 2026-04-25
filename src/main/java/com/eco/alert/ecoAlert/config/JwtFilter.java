@@ -40,33 +40,33 @@ public class JwtFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-        String header = request.getHeader("Authorization");
+        String header = request.getHeader("Authorization"); // legge header
 
-        if (header == null || !header.startsWith("Bearer ")) {
+        if (header == null || !header.startsWith("Bearer ")) {     // controllo token
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = header.substring(7);
+        String token = header.substring(7);         // estrae token
 
         try{
-            if (SecurityContextHolder.getContext().getAuthentication() == null) {
+            if (SecurityContextHolder.getContext().getAuthentication() == null) {   // controllo se già autenticato
 
-                Integer userId = jwtService.extractUserId(token);
-                String role = jwtService.extractRole(token);
+                Integer userId = jwtService.extractUserId(token);   // usa JwtService
+                String role = jwtService.extractRole(token);        // usa JwtService
 
                 List<GrantedAuthority> authorities = List.of(
-                        new SimpleGrantedAuthority("ROLE_" + role)
+                        new SimpleGrantedAuthority("ROLE_" + role)  // crea ruoli
                 );
 
                 UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(userId, null, authorities);
+                        new UsernamePasswordAuthenticationToken(userId, null, authorities);    // crea Authentication
 
                 authentication.setDetails(
                         new WebAuthenticationDetailsSource().buildDetails(request)
                 );
 
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                SecurityContextHolder.getContext().setAuthentication(authentication);   // salva nel contesto
             }
         } catch (Exception e) {
             log.warn("JWT non valido per request {} {} - errore: {}",
