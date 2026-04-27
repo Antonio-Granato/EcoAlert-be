@@ -33,27 +33,24 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
-                // niente CSRF (API REST)
+                .cors(cors -> {})
                 .csrf(csrf -> csrf.disable())
 
-                // JWT = stateless niente sessioni
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                //autorizzazioni
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login", "/sign-in").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll() // 🔥 CORS FIX
+                        .requestMatchers("/sign-in", "/login").permitAll()// 🔥 FIX PATH
                         .anyRequest().authenticated()
                 )
 
-                // gestione 401 custom
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Non autenticato");
                         })
                 )
 
-                // filtro JWT
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

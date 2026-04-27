@@ -40,9 +40,17 @@ public class JwtFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
+        String path = request.getRequestURI();
+        log.info("PATH: {}", path);
+
+        if (path.startsWith("/api/login") || path.startsWith("/api/sign-in")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String header = request.getHeader("Authorization"); // legge header
 
-        if (header == null || !header.startsWith("Bearer ")) {     // controllo token
+        if (header == null || !header.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -67,6 +75,7 @@ public class JwtFilter extends OncePerRequestFilter {
                 );
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);   // salva nel contesto
+                log.info("JWT VALIDATA -> userId={}, role={}", userId, role);
             }
         } catch (Exception e) {
             log.warn("JWT non valido per request {} {} - errore: {}",
@@ -74,6 +83,9 @@ public class JwtFilter extends OncePerRequestFilter {
                     request.getRequestURI(),
                     e.getMessage()
             );
+
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token non valido");
+            return;
         }
 
         filterChain.doFilter(request, response);

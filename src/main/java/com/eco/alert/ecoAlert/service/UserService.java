@@ -72,8 +72,14 @@ public class UserService {
 
     private UtenteOutput creaCittadino(UtenteInput input) {
 
-        if (input.getNome() == null || input.getCognome() == null) {
-            throw new IdODatiMancantiException("Nome e cognome obbligatori.");
+        if (
+                input.getNome() == null ||
+                        input.getCognome() == null ||
+                        input.getCodiceFiscale() == null ||
+                        input.getNumeroTelefono() == null ||
+                        input.getCitta() == null
+        ) {
+            throw new IdODatiMancantiException("Dati obbligatori mancanti.");
         }
 
         // Impediamo che un cittadino inserisca un nome da ente
@@ -151,7 +157,7 @@ public class UserService {
 
         UtenteEntity utenteConStessaMail = utenteDao.findByEmail(input.getEmail());
         if (utenteConStessaMail != null) {
-            throw new EmailDuplicataException();
+            throw new EmailDuplicataException("Email già registrata");
         }
 
         Ruolo ruolo;
@@ -181,13 +187,20 @@ public class UserService {
             throw new LoginException("Credenziali non valide");
         }
 
-        if(!passwordEncoder.matches(loginInput.getPassword(), utente.getPassword())){
+        if (!passwordEncoder.matches(loginInput.getPassword(), utente.getPassword())) {
             throw new LoginException("Credenziali non valide");
         }
 
-        Ruolo ruolo = (utente instanceof CittadinoEntity)
-                ? Ruolo.CITTADINO
-                : Ruolo.ENTE;
+        Ruolo ruolo;
+
+        if (utente instanceof EnteEntity) {
+            ruolo = Ruolo.ENTE;
+        } else if (utente instanceof CittadinoEntity) {
+            ruolo = Ruolo.CITTADINO;
+        } else {
+            throw new RuntimeException("Tipo utente sconosciuto");
+        }
+
         String token = jwtService.generateToken(utente.getId(), ruolo.name());
 
         LoginOutput output = new LoginOutput();
@@ -285,7 +298,7 @@ public class UserService {
             UtenteEntity existing = utenteDao.findByEmail(input.getEmail());
 
             if (existing != null && !existing.getId().equals(id)) {
-                throw new EmailDuplicataException();
+                throw new EmailDuplicataException("Email già registrata");
             }
 
             utente.setEmail(input.getEmail());
@@ -317,7 +330,7 @@ public class UserService {
         return getUserById(id);
     }
 
-    @PreAuthorize("#idEnte == authentication.principal")
+    @PreAuthorize("#idEnte == T(java.lang.Integer).valueOf(authentication.name)")
     @Transactional
     public List<SegnalazioneOutput> getSegnalazioniByEnteAndStato(
             Integer idEnte,
@@ -336,7 +349,7 @@ public class UserService {
         return segnalazioni.stream().map(segnalazioneService::toOutput).toList();
     }
 
-    @PreAuthorize("#idEnte == authentication.principal")
+    @PreAuthorize("#idEnte == T(java.lang.Integer).valueOf(authentication.name)")
     @Transactional
     public SegnalazioniStatisticheOutput getSegnalazioniStatistiche(Integer idEnte){
 
